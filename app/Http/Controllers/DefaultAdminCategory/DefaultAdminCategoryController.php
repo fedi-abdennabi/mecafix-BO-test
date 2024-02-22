@@ -3,7 +3,9 @@
 namespace App\Http\Controllers\DefaultAdminCategory;
 
 use App\Http\Controllers\Controller;
+use App\Models\Clients;
 use App\Models\DefaultAdminCategory;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Http\Request;
 
 class DefaultAdminCategoryController extends Controller

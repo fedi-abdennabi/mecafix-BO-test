@@ -15,6 +15,6 @@ class Clients extends Model
     }
 
     public function User(){
-        return $this->belongsTo(User::class, 'userId');
+        return $this->belongsTo(User::class, 'admin_id');
     }
 }

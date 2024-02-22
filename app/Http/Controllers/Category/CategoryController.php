@@ -11,6 +11,12 @@ class CategoryController extends Controller
 {
     public function createCategory(Request $request, $folderId)
     {
+        $this->validate(
+            $request,
+            [
+                'categoryName' => 'required|unique:categories',
+            ]
+        );
         $category = new Category();
         $category->categoryName = $request->input('categoryName');
         $category->save();

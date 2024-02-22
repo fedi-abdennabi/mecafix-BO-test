@@ -8,8 +8,10 @@ use App\Models\Category;
 use App\Models\Clients;
 use App\Models\DefaultAdminCategory;
 use App\Models\Folder;
+use Illuminate\Validation\Rule;
 use App\Models\Input;
 use App\Models\SubCategory;
+use App\SmsTwilio\TwilioService;
 use App\Traits\base64DecodeFile;
 use App\Traits\S3UploadFile;
 use Illuminate\Http\Request;
@@ -19,6 +21,13 @@ class folderController extends Controller
     use S3UploadFile;
     use base64DecodeFile;
 
+    protected $twilio;
+
+    public function __construct(TwilioService $twilio)
+    {
+        $this->twilio = $twilio;
+    }
+
     public function getFolders(Request $request)
     {
         $userId = auth()->id();
@@ -26,38 +35,49 @@ class folderController extends Controller
         $order = filled($request->input('order')) ? $request->input('order') : 'DESC';
         $search = $request->input('search');
 
-        $folderList = Folder::with('Car', 'Clients')
+        $folderList = Folder::with('Car', 'Clients', 'Category')
             ->where('userId', $userId)
             ->where(function ($query) use ($search) {
-                $query->where('hashtag', 'like', "%{$search}%")
-                    ->orWhere('contrat', 'like', "%{$search}%")
-                    ->orWhere('arrivalType', 'like', "%{$search}%")
-                    ->orWhere('panne', 'like', "%{$search}%")
-                    ->orWhere('vehiculeType', 'like', "%{$search}%")
-                    ->orWhere('notes', 'like', "%{$search}%")
-                    ->orWhere('mileage', 'like', "%{$search}%")
+                $query->where('hashtag', 'LIKE', '%' . $search . '%')
+                    ->orWhere('contrat', 'LIKE', '%' . $search . '%')
+                    ->orWhere('id', 'LIKE', '%' . $search . '%')
+                    ->orWhere('arrivalType', 'LIKE', '%' . $search . '%')
+                    ->orWhere('statusValue', 'LIKE', '%' . $search . '%')
+                    ->orWhere('panne', 'LIKE', '%' . $search . '%')
+                    ->orWhere('vehiculeType', 'LIKE', '%' . $search . '%')
+                    ->orWhere('notes', 'LIKE', '%' . $search . '%')
                     ->orWhereHas('Car', function ($query) use ($search) {
-                        $query->where('carType', 'like', "%{$search}%")
-                            ->orWhere('immatriculation', 'like', "%{$search}%")
-                            ->orWhere('brand', 'like', "%{$search}%")
-                            ->orWhere('model', 'like', "%{$search}%")
-                            ->orWhere('box', 'like', "%{$search}%")
-                            ->orWhere('mileage', 'like', "%{$search}%");
+                        $query->whereRaw("CONCAT(brand, ' ', model) LIKE ?", ['%' . $search . '%'])
+                            ->orWhere('carType', 'LIKE', '%' . $search . '%')
+                            ->orWhere('immatriculation', 'LIKE', '%' . $search . '%')
+                            ->orWhere('box', 'LIKE', '%' . $search . '%')
+                            ->orWhere('mileage', 'LIKE', '%' . $search . '%');
                     })
                     ->orWhereHas('Clients', function ($query) use ($search) {
-                        $query->whereRaw("concat(firstName,' ',lastName) like '%" . $search . "%' ")
-                            ->orWhere('type', 'like', "%{$search}%")
-                            ->orWhere('RegistrationNumber', 'like', "%{$search}%")
-                            ->orWhere('HeadquartersAddress', 'like', "%{$search}%")
-                            ->orWhere('activitySector', 'like', "%{$search}%")
-                            ->orWhere('city', 'like', "%{$search}%")
-                            ->orWhere('postalCode', 'like', "%{$search}%")
-                            ->orWhere('phone', 'like', "%{$search}%")
-                            ->orWhere('adress', 'like', "%{$search}%")
-                            ->orWhere('email', 'like', "%{$search}%");
+                        $query->whereRaw("CONCAT(firstName, ' ', lastName) LIKE ?", ['%' . $search . '%'])
+                            ->orWhere('type', 'LIKE', '%' . $search . '%')
+                            ->orWhere('RegistrationNumber', 'LIKE', '%' . $search . '%')
+                            ->orWhere('HeadquartersAddress', 'LIKE', '%' . $search . '%')
+                            ->orWhere('activitySector', 'LIKE', '%' . $search . '%')
+                            ->orWhere('city', 'LIKE', '%' . $search . '%')
+                            ->orWhere('postalCode', 'LIKE', '%' . $search . '%')
+                            ->orWhere('phone', 'LIKE', '%' . $search . '%')
+                            ->orWhere('adress', 'LIKE', '%' . $search . '%')
+                            ->orWhere('email', 'LIKE', '%' . $search . '%');
+                    })
+                    ->orWhereHas('Category', function ($query) use ($search) {
+                        $query->where('categoryName', 'LIKE', '%' . $search . '%');
+                    })
+                    ->orWhereHas('Category.SubCategory', function ($query) use ($search) {
+                        $query->where('subCategoryName', 'LIKE', '%' . $search . '%');
+                    })
+                    ->orWhereHas('Category.SubCategory.Input', function ($query) use ($search) {
+                        $query->where('inputValue', 'LIKE', '%' . $search . '%')
+                            ->orWhere('inputName', 'LIKE', '%' . $search . '%')
+                            ->orWhere('label', 'LIKE', '%' . $search . '%');
                     });
             })
-            ->orderby($orderBy, $order)
+            ->orderBy($orderBy, $order)
             ->get();
 
         return response()->json($folderList);
@@ -65,6 +85,7 @@ class folderController extends Controller
 
     public function createNewFolder(Request $request)
     {
+        $user_id = auth()->user()->id;
         $this->validate(
             $request,
             [
@@ -72,7 +93,12 @@ class folderController extends Controller
                 'video' => 'mimes:mp4,avi',
                 'firstName' => 'required',
                 'lastName' => 'required',
-                'email' => 'required|unique:clients',
+                'email' => [
+                    'required',
+                    Rule::unique('clients')->where(function ($query) use ($user_id) {
+                        return $query->where('admin_id', $user_id);
+                    })
+                ],
                 'phoneNumber' => 'required',
                 'adresse' => 'required',
                 'city' => 'required',
@@ -89,6 +115,7 @@ class folderController extends Controller
         $client->adress = $request->input('adresse');
         $client->city = $request->input('city');
         $client->postalCode = $request->input('postalCode');
+        $client->admin_id = auth()->id();
 
         $client->save();
 
@@ -126,13 +153,21 @@ class folderController extends Controller
         }
         $car->save();
 
-        $client->car()->attach($car->id);
+        $car->Client()->attach($client->id);
 
         // create new folder
         $folder = new Folder();
         $folder->carId = $car->id;
         $folder->clientId = $client->id;
-        $folder->userId = auth()->id();
+        $user = auth()->user();
+        $roleName = $user->Role->roleName;
+
+        if ($roleName == 'admin') {
+            $folder->userId = $user->id;
+        } elseif ($roleName == 'client') {
+            $folder->userId = $user->adminId;
+        }
+
         $folder->save();
 
         $categories = DefaultAdminCategory::with('subCategoryDefaults.defaultInputs')->get();
@@ -182,9 +217,20 @@ class folderController extends Controller
         $folder->mileage = $request->input('mileage');
         $folder->arrivalType = $request->input('arrivalType');
         $folder->created_at = $request->input('date');
+
         $folder->save();
         if ($folder->car) {
             $folder->car->mileage = $request->input('mileage');
+            if ($request->filled('picture') or $request->hasFile('picture')) {
+                $carImage = $request->file('picture');
+                if (str_contains($request->input('picture'), 'data:')) {
+                    $folder->car->image = $this->base64DecodeFile($request->input('picture'), 'car', 'cars', null);
+                } else {
+                    $image = file_get_contents($carImage);
+                    $carName = $request->file('picture')->getClientOriginalName();
+                    $folder->car->image = $this->uploadFileToS3($image, $carName, 'cars');
+                }
+            }
             $folder->car->save();
         }
 
@@ -197,7 +243,7 @@ class folderController extends Controller
         if (!$client) {
             return response()->json('Client not found', 404);
         }
-        $car = $client->Car()->get();
+        $car = $client->Car()->first();
         if (!$car) {
             return response()->json('Car not found for the client', 404);
         }
@@ -209,8 +255,40 @@ class folderController extends Controller
         $folder->panne = $request->input('panne');
         $folder->created_at = $request->input('created_at');
         $folder->notes = $request->input('notes');
+
+        $imageUrls = [];
+        $images = $request->input('images', []);
+
+        foreach ($images as $base64Image) {
+            if (str_contains($base64Image, 'data:')) {
+                $urlImage = $this->base64DecodeFile($base64Image, 'folder', 'folders', null);
+                array_push($imageUrls, $urlImage);
+            }
+        }
+
+        $folder->images = json_encode($imageUrls);
         $folder->save();
 
-        return response()->json('folder added successfully');
+        return response()->json('Folder added successfully');
+    }
+    public function updateStatusFolder(Request $request, $id)
+    {
+        try {
+            $folder = Folder::find($id);
+            if (!$folder) {
+                return response()->json(['message' => 'Folder not found'], 404);
+            }
+            $newStatusValue = $request->input('statusValue');
+            $folder->statusValue = $newStatusValue;
+            $folder->statusId = $folder->id;
+            $folder->save();
+            $to = '+21622471859';
+            $message = "Hello, your car's status has been updated to: {$newStatusValue}";
+            $this->twilio->sendMessage($to, $message);
+
+            return response()->json(['message' => 'Folder updated successfully', 'data' => $folder]);
+        } catch (\Exception $e) {
+            return response()->json(['message' => 'Error updating folder', 'error' => $e->getMessage()], 500);
+        }
     }
 }

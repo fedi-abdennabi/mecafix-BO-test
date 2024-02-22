@@ -33,6 +33,7 @@ class SubcategoryController extends Controller
     public function deleteSubCategory($id)
     {
         $subCategory = SubCategory::findOrFail($id);
+        $subCategory->Input()->delete();
         $subCategory->delete();
 
         return response()->json(['message' => 'Deleted successfully']);
@@ -43,6 +44,9 @@ class SubcategoryController extends Controller
         $subCategory = SubCategory::findOrFail($id);
         if ($request->has('subCategoryName')) {
             $subCategory->subCategoryName = $request->input('subCategoryName');
+        }
+        if ($request->has('display')) {
+            $subCategory->display = $request->input('display');
         }
         $subCategory->save();
 
@@ -85,7 +89,7 @@ class SubcategoryController extends Controller
             $input = new Input();
             $input->inputName = $oldInput->inputName;
             $input->inputType = $oldInput->inputType;
-            $input->inputValue = $oldInput->inputValue;
+            $input->inputValue = null;
             $input->inputOrder = $oldInput->inputOrder;
             $input->options = $oldInput->options;
             $input->label = $oldInput->label;
@@ -93,7 +97,6 @@ class SubcategoryController extends Controller
             $input->principalImage = $oldInput->principalImage;
             $input->display = $oldInput->display;
             $input->sub_category_id = $newSubCategory->id;
-            // $input->folder_Id = $folder->id;
             $input->save();
         }
 

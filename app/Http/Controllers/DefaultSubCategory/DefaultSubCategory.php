@@ -4,21 +4,28 @@ namespace App\Http\Controllers\DefaultSubCategory;
 
 use App\Http\Controllers\Controller;
 use App\Models\SubCategoryDefault;
+use App\Models\DefaultCategory;
 use Illuminate\Http\Request;
 
 class DefaultSubCategory extends Controller
 {
     public function createDefaultSubCategorie(Request $request, $categoryId)
     {
+        if ($categoryId){
+        $defaultCategory = DefaultCategory::findOrFail($categoryId);
         $defaultSubCategorie = new SubCategoryDefault();
-        $defaultSubCategorie->default_category_id = $categoryId;
+        $defaultSubCategorie->default_category_id = $defaultCategory->id;
         $defaultSubCategorie->subCategoryName = $request->input('subCategoryName');
         $defaultSubCategorie->save();
 
         return response()->json($defaultSubCategorie);
     }
+    else{
+        return response()->json('error');
+    }
+    }
 
-    public function getAllDefaultSubCategories(Request $request,$categoryId)
+    public function getAllDefaultSubCategories(Request $request, $categoryId)
     {
         $defaultSubCategories = SubCategoryDefault::where('default_category_id', $categoryId)->paginate(8);
 

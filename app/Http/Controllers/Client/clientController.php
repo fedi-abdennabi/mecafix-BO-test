@@ -5,19 +5,18 @@ namespace App\Http\Controllers\Client;
 use App\Http\Controllers\Controller;
 use App\Models\Clients;
 use App\Models\Folder;
+use Auth;
 use Illuminate\Http\Request;
 
-class clientController extends Controller
+class ClientController extends Controller
 {
     // get clients by id
     public function getClientById($id)
     {
-        // Folder::with("Car", "Clients")->where("userId", $userId)->get();
         $client = Clients::with('Car')->where('id', $id)->first();
         if (!$client) {
             return response()->json(['message' => 'Client not found'], 404);
         }
-
         return response()->json($client, 200);
     }
 
@@ -27,15 +26,27 @@ class clientController extends Controller
         $orderBy = filled($request->input('orderBy')) ? $request->input('orderBy') : 'id';
         $order = filled($request->input('order')) ? $request->input('order') : 'DESC';
         $search = $request->input('search', '');
+        $adminId = Auth::id();
 
-        $query = Clients::with('folder', 'car')
-        ->where(function ($query) use ($search) {
-            $query->where('firstName', 'LIKE', "%{$search}%")
-                ->orWhere('lastName', 'LIKE', "%{$search}%");
-        });
-
+        $query = Clients::with('Folder', 'Car')
+            ->where('admin_id', $adminId)
+            ->where(function ($query) use ($search) {
+                $query->where('firstName', 'LIKE', "%{$search}%")
+                    ->orWhere('lastName', 'LIKE', "%{$search}%")
+                    ->orWhere('email', 'LIKE', "%{$search}%")
+                    ->orWhere('adress', 'LIKE', "%{$search}%")
+                    ->orWhere('postalCode', 'LIKE', "%{$search}%")
+                    ->orWhereHas('car', function ($query) use ($search) {
+                        $query->where('brand', 'LIKE', "%{$search}%")
+                            ->orWhere('immatriculation', 'LIKE', "%{$search}%")
+                            ->orWhere('model', 'LIKE', "%{$search}%");
+                    })
+                    ->orWhereHas('folder', function ($query) use ($search) {
+                        $query->where('id', 'LIKE', "%{$search}%")
+                            ->orWhere('statusValue', 'LIKE', "%{$search}%");
+                    });
+            });
         $clients = $query->orderBy($orderBy, $order)->paginate(4);
-
         return response()->json($clients, 200);
     }
 
@@ -51,18 +62,15 @@ class clientController extends Controller
     {
         $query = Clients::query();
 
-        // Optional: Handle search parameter
         if ($request->has('search')) {
-            $query->where('name', 'like', '%'.$request->search.'%');
+            $query->where('name', 'like', '%' . $request->search . '%');
         }
-
-        // Order by created_at in descending order by default
         $orderBy = $request->get('orderBy', 'created_at');
         $order = $request->get('order', 'desc');
 
         $clients = $query->orderBy($orderBy, $order)
-                         ->take(5)
-                         ->get();
+            ->take(5)
+            ->get();
 
         return response()->json($clients);
     }

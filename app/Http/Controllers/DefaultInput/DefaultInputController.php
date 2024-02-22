@@ -15,14 +15,18 @@ class DefaultInputController extends Controller
         $defaultInput->inputName = $request->input('inputName');
         $defaultInput->inputType = $request->input('inputType');
         $defaultInput->inputValue = null;
-        $highestOrder = DefaultInput::where('sub_category_default_id', $subCategoryId)->max('inputOrder');
-        $defaultInput->inputOrder = $highestOrder + 1;
         $defaultInput->label = $request->input('label');
-        $defaultInput->display = $request->input('display') ?? true;
+        $defaultInput->display = true;
         $defaultInput->principalImage = $request->input('principalImage') ?? false;
         $defaultInput->options = $request->input('options');
-        $defaultInput->helper = $request->input('helper') ?? '';
+        $defaultInput->helper = $request->input('helper', '');
         $defaultInput->folder_id = null;
+        if ($defaultInput->principalImage) {
+            $defaultInput->inputOrder = 0;
+        } else {
+            $highestOrder = DefaultInput::where('sub_category_default_id', $subCategoryId)->max('inputOrder');
+            $defaultInput->inputOrder = $request->input('inputOrder', $highestOrder + 1);
+        }
         $defaultInput->save();
 
         return response()->json($defaultInput);
@@ -31,8 +35,8 @@ class DefaultInputController extends Controller
     public function getAllInputBySubCategoryId($subCategoryId)
     {
         $defaultInputs = DefaultInput::where('sub_category_default_id', $subCategoryId)
-                                     ->orderBy('InputOrder', 'asc')
-                                     ->get();
+            ->orderBy('InputOrder', 'asc')
+            ->get();
 
         return response()->json($defaultInputs);
     }
@@ -40,10 +44,19 @@ class DefaultInputController extends Controller
     public function updateInput(Request $request, $inputId)
     {
         $defaultInput = DefaultInput::findOrFail($inputId);
-        $defaultInput->inputName = $request->input('inputName', $defaultInput->inputName);
+        $defaultInput->inputName = $request->input('name', $defaultInput->inputName);
         $defaultInput->inputValue = $request->input('inputValue', $defaultInput->inputValue);
         $defaultInput->inputType = $request->input('inputType', $defaultInput->inputType);
-        $defaultInput->inputOrder = $request->input('inputOrder', $defaultInput->inputOrder);
+        $oldStatePrincipalImage = $defaultInput->principalImage;
+        $newStatePrincipalImage = $request->input('principalImage', $oldStatePrincipalImage);
+        $stateChangedToFalse = $oldStatePrincipalImage == true && $newStatePrincipalImage == false;
+        $defaultInput->principalImage = $newStatePrincipalImage;
+        if ($stateChangedToFalse) {
+            $highestOrder = DefaultInput::where('sub_category_default_id', $defaultInput->sub_category_default_id)->max('inputOrder');
+            $defaultInput->inputOrder = $highestOrder + 1;
+        } else {
+            $defaultInput->inputOrder = $request->input('inputOrder', $defaultInput->inputOrder);
+        }
         $defaultInput->label = $request->input('label', $defaultInput->label);
         $defaultInput->display = $request->input('display', $defaultInput->display);
         $defaultInput->options = $request->input('options', $defaultInput->options);
@@ -72,14 +85,15 @@ class DefaultInputController extends Controller
     public function incrementOrder(Request $request, $inputId)
     {
         $currentInput = DefaultInput::find($inputId);
+        $inputList = DefaultInput::where('sub_category_default_id', '=', $currentInput->sub_category_default_id)->get();
         if ($currentInput) {
-            $isFirstInput = DefaultInput::where('inputOrder', '>', $currentInput->inputOrder)->count() === 0;
+            $isFirstInput = $inputList->where('inputOrder', '>', $currentInput->inputOrder)->count() === 0;
             if ($isFirstInput) {
-                return response()->json(['message' => 'This is the first input and cannot be incremented'], 400);
+                return response()->json(['error' => 'This is the first input and cannot be decremented'], 400);
             }
-            $nextInput = DefaultInput::where('inputOrder', '>', $currentInput->inputOrder)
-                              ->orderBy('inputOrder', 'asc')
-                              ->first();
+            $nextInput = $inputList->where('inputOrder', '>', $currentInput->inputOrder)
+                ->sortBy('inputOrder')
+                ->first();
 
             if ($nextInput) {
                 $tempOrder = $currentInput->inputOrder;
@@ -100,31 +114,32 @@ class DefaultInputController extends Controller
     {
         $currentInput = DefaultInput::find($inputId);
 
-        if ($currentInput) {
-            $isLastInput = DefaultInput::where('inputOrder', '<', $currentInput->inputOrder)->count() === 0;
+        $inputList = DefaultInput::where('sub_category_default_id', '=', $currentInput->sub_category_default_id)->get();
+        $isLastInput = $inputList->where('inputOrder', '<', $currentInput->inputOrder)->count() === 0;
 
-            if ($isLastInput) {
-                return response()->json(['message' => 'This is the last input and cannot be decremented'], 400);
-            }
+        if ($isLastInput) {
+            return response()->json(['error' => 'This is the last input and cannot be incremented'], 400);
+        }
 
-            $previousInput = DefaultInput::where('inputOrder', '<', $currentInput->inputOrder)
-                              ->orderBy('inputOrder', 'desc')
-                              ->first();
+        $previousInput = $inputList->where('inputOrder', '<', $currentInput->inputOrder)
+            ->sortByDesc('inputOrder')
+            ->first();
 
-            if ($previousInput) {
-                $tempOrder = $currentInput->inputOrder;
-                $currentInput->inputOrder = $previousInput->inputOrder;
-                $previousInput->inputOrder = $tempOrder;
+        if ($previousInput) {
+            $tempOrder = $currentInput->inputOrder;
+            $currentInput->inputOrder = $previousInput->inputOrder;
+            $previousInput->inputOrder = $tempOrder;
 
-                $currentInput->save();
-                $previousInput->save();
-            }
+            $currentInput->save();
+            $previousInput->save();
 
             return response()->json(['message' => 'Order decremented successfully']);
-        } else {
-            return response()->json(['message' => 'DefaultInput not found'], 404);
         }
+
+        // Ajoutez une réponse pour le cas où aucun input précédent n'est trouvé
+        return response()->json(['message' => 'Previous input not found'], 404);
     }
+
 
     public function displayTheFieldToClient(Request $request, $inputId)
     {

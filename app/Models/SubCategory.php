@@ -7,11 +7,14 @@ use Illuminate\Database\Eloquent\Model;
 class SubCategory extends Model
 {
     protected $table = 'subcategories';
-    public function Category(){
+
+    public function Category()
+    {
         return $this->belongsTo(Category::class, 'categoryId');
     }
 
-    public function Input(){
+    public function Input()
+    {
         return $this->hasMany(Input::class);
     }
 }

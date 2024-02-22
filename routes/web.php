@@ -116,13 +116,16 @@ Route::group(['middleware' => 'auth'], function ($router) {
 });
 
 Route::group(['middleware' => 'auth'], function ($router) {
-    Route::group(['prefix' => 'admin/folder', 'middleware' => 'isAdmin'], function ($router) {
-        Route::get('/', 'Folder\folderController@getFolders');
-        Route::get('/{id}', 'Folder\folderController@getFolderDetails');
-        Route::get('/client/{id}', 'Client\clientController@getClientData');
+    Route::group(['prefix' => 'admin/folder'], function ($router) {
         Route::post('/create', 'Folder\folderController@createNewFolder');
-        Route::post('/{clientId}/add', 'Folder\folderController@addFolder');
-        Route::put('/update/{id}', 'Folder\folderController@updateFolder');
+        Route::group(['middleware' => 'isAdmin'], function ($router) {
+            Route::get('/', 'Folder\folderController@getFolders');
+            Route::get('/{id}', 'Folder\folderController@getFolderDetails');
+            Route::get('/client/{id}', 'Client\ClientController@getClientData');
+            Route::post('/{clientId}/add', 'Folder\folderController@addFolder');
+            Route::put('/update/{id}', 'Folder\folderController@updateFolder');
+            Route::put('/status/update/{id}', 'Folder\folderController@updateStatusFolder');
+        });
     });
 
     Route::group(['middleware' => 'auth'], function ($router) {
@@ -153,6 +156,8 @@ Route::group(['middleware' => 'auth'], function ($router) {
                 Route::delete('/{inputId}', 'Inputs\InputsController@deleteInput');
                 Route::get('/all/{subCategoryId}', 'Inputs\InputsController@getAllInputBySubCategoryId');
                 Route::post('/displayFieldToClient/{inputId}', 'Inputs\InputsController@displayTheFieldToClient');
+                Route::post('/incrementOrder/{inputId}', 'Inputs\InputsController@incrementOrder');
+                Route::post('/decrementOrder/{inputId}', 'Inputs\InputsController@decrementOrder');
             });
 
             Route::group(['prefix' => 'admin/defaultSubcategory'], function ($router) {
@@ -170,6 +175,8 @@ Route::group(['middleware' => 'auth'], function ($router) {
                 Route::delete('/{inputId}', 'DefaultAdminInput\DefaultAdminInputController@deleteInput');
                 Route::get('/all/{subCategoryId}', 'DefaultAdminInput\DefaultAdminInputController@getAllInputBySubCategoryId');
                 Route::post('/displayFieldToClient/{inputId}', 'DefaultAdminInput\DefaultAdminInputController@displayTheFieldToClient');
+                Route::post('/incrementOrder/{inputId}', 'DefaultAdminInput\DefaultAdminInputController@incrementOrder');
+                Route::post('/decrementOrder/{inputId}', 'DefaultAdminInput\DefaultAdminInputController@decrementOrder');
             });
 
             Route::group(['prefix' => 'admin/defaultCategories'], function ($router) {
@@ -179,17 +186,19 @@ Route::group(['middleware' => 'auth'], function ($router) {
                 Route::post('/create', 'DefaultAdminCategory\DefaultAdminCategoryController@createDefaultCategorie');
                 Route::get('/{id}', 'DefaultAdminCategory\DefaultAdminCategoryController@getDefaultCategorieDetails');
             });
+
+            Route::group(['prefix' => 'admin/clients'], function ($router) {
+                Route::get('/', 'Client\ClientController@getAllClients');
+                Route::get('/recent', 'Client\ClientController@recentClients');
+                Route::get('/{id}', 'Client\ClientController@getClientById');
+                Route::put('/update/{id}', 'Client\ClientController@updateClient');
+                Route::delete('/delete/{id}', 'Client\ClientController@deleteClient');
+            });
         });
     });
-    Route::group(['middleware' => 'auth'], function ($router) {
-        Route::group(['prefix' => 'admin/clients', 'middleware' => 'isAdmin'], function ($router) {
-            Route::get('/', 'Client\clientController@getAllClients');
-            Route::get('/recent', 'Client\clientController@recentClients');
-            Route::get('/{id}', 'Client\clientController@getClientById');
-            Route::put('/update/{id}', 'Client\clientController@updateClient');
-            Route::delete('/delete/{id}', 'Client\clientController@deleteClient');
-        });
-    });
+
+
+
 
     Route::group(['middleware' => 'auth'], function ($router) {
         Route::group(['prefix' => 'admin/cars', 'middleware' => 'isAdmin'], function ($router) {
@@ -203,6 +212,12 @@ Route::group(['middleware' => 'auth'], function ($router) {
     Route::group(['middleware' => 'auth'], function ($router) {
         Route::group(['prefix' => 'admin/status', 'middleware' => 'isAdmin'], function ($router) {
             Route::get('/', 'carStatus\CarStatusController@getAllStatus');
+        });
+    });
+
+    Route::group(['middleware' => 'auth'], function ($router) {
+        Route::group(['prefix' => 'role'], function ($router) {
+            Route::get('/', 'SuperAdmin\UserController@getUserRole');
         });
     });
 });

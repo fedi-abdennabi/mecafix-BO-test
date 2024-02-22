@@ -16,9 +16,12 @@ class ConfirmAccount extends Mailable
      *
      * @return void
      */
+    protected $token;
+    protected $clientEmail;
     public function __construct($request)
     {
-        $this->userID = $request[0];
+        $this->token = $request[0];
+        $this->clientEmail = $request[1];
     }
 
     /**
@@ -29,7 +32,8 @@ class ConfirmAccount extends Mailable
     public function build()
     {
         return $this->view('confirmAccount')->with([
-            'userID' => $this->userID,
+            'token' => $this->token,
+            'clientEmail' => $this->clientEmail
         ]);
     }
 }

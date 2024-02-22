@@ -30,14 +30,37 @@ class CarController extends Controller
     //create new car function
     public function addCar(Request $request)
     {
+        $this->validate(
+            $request,
+            [
+                'immatriculation' => 'unique:cars|regex:/^[0-9]{4}-[A-Za-z]{2}-[0-9]{4}$/',
+                'brand' => 'required',
+                'model' => 'required',
+                'mileage' => 'required',
+            ]
+        );
+
         // Create a new car
         $car = new Car();
         $car->carType = $request->input('carType');
-        $car->immatriculation = $request->input('registration');
+        $car->immatriculation = $request->input('immatriculation');
         $car->brand = $request->input('brand');
         $car->model = $request->input('model');
         $car->box = $request->input('box');
         $car->mileage = $request->input('mileage');
+
+        // upload image
+        if ($request->filled('picture') or $request->hasFile('picture')) {
+            $carImage = $request->file('picture');
+            if (str_contains($request->input('picture'), 'data:')) {
+                $car->image = $this->base64DecodeFile($request->input('picture'), 'car', 'cars', null);
+            } else {
+                $image = file_get_contents($carImage);
+                $carName = $request->file('picture')->getClientOriginalName();
+                $car->image = $this->uploadFileToS3($image, $carName, 'cars');
+            }
+        }
+
         $car->save();
 
         $clientId = $request->input('clientId');

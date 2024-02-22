@@ -68,16 +68,17 @@
         <p>Bienvenue sur notre plateforme Mecafix.</p>
         <p>Pour valider votre inscription, cliquez sur le bouton suivant :</p>
         <div class="footer">
-            <a class="button" href="{!! env('FRONT_APP_URL') !!}app/{{ $token }}-confirm-account">Confirmer</a>
+            <a class="button" href="<?php echo env('FRONT_APP_URL'); ?>app/<?php echo e($token); ?>-confirm-account">Confirmer</a>
         </div>
 
         <!-- Nouvelle section avec arrière-plan et titre -->
         <div class="access-info">
-            <h2>Information importante :</h2>
-            <p>Un compte pour accès sur tablette (pour vos clients sur place) est créé automatiquement avec l'émail  : <strong>{{ $clientEmail }}</strong></p>
+            <h2>Accès à votre compte client</h2>
+            <p>Après la confirmation de votre compte, pour accéder à votre espace client, utilisez l'adresse email suivante : <strong><?php echo e($clientEmail); ?></strong></p>
             <p>Utilisez le même mot de passe que celui de votre compte administrateur.</p>
         </div>
     </div>
 </body>
 
 </html>
+<?php /**PATH C:\Users\21653\Documents\GitHub\Mecafix-V1\mecafix-BO\resources\views/confirmAccount.blade.php ENDPATH**/ ?>

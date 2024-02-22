@@ -6,6 +6,11 @@ use Illuminate\Database\Eloquent\Model;
 
 class Folder extends Model
 {
+    protected $fillable = ['hashtag', 'contrat', 'notes', 'vehiculeType', 'mileage', 'panne', 'images', 'video', 'statusValue', 'carId', 'userId', 'clientId', 'statusId'];
+    protected $casts = [
+        'images' => 'array',
+    ];
+
     public function Car()
     {
         return $this->belongsTo(Car::class, 'carId');

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Mail\ConfirmAccount;
 use App\Models\Company;
 use App\Models\Role;
+use Illuminate\Support\Facades\Crypt;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -39,7 +40,7 @@ class accountController extends Controller
             [
                 'firstName' => 'required',
                 'lastName' => 'required',
-                'email' => 'required|email|unique:users,email,'.$user->id,
+                'email' => 'required|email|unique:users,email,' . $user->id,
             ]
         );
 
@@ -58,14 +59,7 @@ class accountController extends Controller
         if ($request->filled('langKey')) {
             $user->langKey = $request->input('langKey');
         }
-        // if ($request->file('logo')) {
-        //     if (!empty($user->logo)) {
-        //         $this->deleteFileFromS3($user->logo);
-        //     }
-        //     $logo = file_get_contents($request->file('logo'));
-        //     $logoName = $request->file('logo')->getClientOriginalName();
-        //     $user->logo = $this->uploadFileToS3($logo,$logoName,'logos');
-        // }
+
         $user->save();
 
         return response()->json($user);
@@ -99,16 +93,33 @@ class accountController extends Controller
         $user->activated = false;
         $user->roleId = $adminId;
 
-        // send user an email to activate his account
         if ($user->save()) {
+            $clientId = Role::where('roleName', 'client')->pluck('id')->first();
+            $client = new User();
+            $emailClient = $user->email;
+            list($nomUtilisateur, $domaine) = explode('@', $emailClient);
+            $nomUtilisateurModifie = $nomUtilisateur . "-client";
+            $emailModifie = $nomUtilisateurModifie . '@' . $domaine;
+            $client->email = $emailModifie;
+            $client->firstName = $request->input('firstName');
+            $client->lastName = $request->input('lastName');
+            $client->password = Hash::make($request->input('password'));
+            $client->phoneNumber = $request->input('phoneNumber');
+            $client->langKey = $request->input('langKey');
+            $client->activated = false;
+            $client->roleId = $clientId;
+        }
+        // send user an email to activate his account
+        if ($client->save()) {
+            $toEncrypt = $user->id . '|' . $client->id;
+            $token = Crypt::encryptString($toEncrypt);
             $company = new Company();
             $company->employerId = $user->id;
             $company->denomination = $request->input('denomination');
             $company->save();
         }
-
         // send mail to confirm account and activate it
-        Mail::to($request->input('email'))->send(new ConfirmAccount([$user->id]));
+        Mail::to($request->input('email'))->send(new ConfirmAccount([$token, $client->email]));
 
         return response()->json($user);
     }
@@ -120,10 +131,15 @@ class accountController extends Controller
      */
     public function firstAccountActivation(Request $request, $key)
     {
-        $user = User::find($key);
-        if ($user->created_at->format('Y-m-d H:i:s') === $user->updated_at->format('Y-m-d H:i:s')) {
+        $decrypted = Crypt::decryptString($key);
+        list($userId, $clientId) = explode('|', $decrypted);
+        $user = User::find($userId);
+        $client = User::find($clientId);
+        if (($user->created_at->format('Y-m-d H:i:s') === $user->updated_at->format('Y-m-d H:i:s')) && ($client->created_at->format('Y-m-d H:i:s') === $client->updated_at->format('Y-m-d H:i:s'))) {
             $user->activated = true;
+            $client->activated = true;
             $user->save();
+            $client->save();
 
             return response()->json('success');
         }
