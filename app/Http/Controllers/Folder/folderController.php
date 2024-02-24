@@ -217,6 +217,7 @@ class folderController extends Controller
         $folder->mileage = $request->input('mileage');
         $folder->arrivalType = $request->input('arrivalType');
         $folder->created_at = $request->input('date');
+        $folder->position = $request ->input('position');
 
         $folder->save();
         if ($folder->car) {
@@ -255,7 +256,7 @@ class folderController extends Controller
         $folder->panne = $request->input('panne');
         $folder->created_at = $request->input('created_at');
         $folder->notes = $request->input('notes');
-
+        $folder->position = $request ->input('position');
         $imageUrls = [];
         $images = $request->input('images', []);
 
